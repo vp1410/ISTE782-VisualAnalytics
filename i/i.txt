@@ -1,0 +1,11 @@
+1.) Menu driven applications are problematic.We are going to spend our term using command driven application, which is R programming language. Hence, menu driven issues aren't significant. It might be, if we were to use tableau for the whole semester.
+
+2.)There is a panel which says, "Show Me" on the top right side of the tableau workbook  that we create. Based on our raw data, we get recommendations best suited for visualization.
+
+3.) Yes, Tableau is biased. Tableau relies on measurement. Measures create axes in the view. Some things are hard to measure,for example love, each person has their own definiton to measure. Other example is time,time can change rapidly and there are other time related constraints so it is difficult to measure. As stated by Lord Kelvin,"If you can not measure it, when you cannot express in numbers, your knowledge is of meagre and unsatisfactory kind".
+
+4.)We cannot be blamed because when you give somebody a tool it supports our decision at that point of time. But then conditions change in future, you may be still associated with that tool and that can be potential source of trouble.
+
+5.)Tableau is a free service that allows public to post visualizations on web. So there are privacy issues involved, based on that it should report back to mothership how other people are using it.
+
+6.)Data visualization is representation of information in the form of picture, charts or diagram.In my opinion, text should be subtracted because picture with words cannot be data visualization.
