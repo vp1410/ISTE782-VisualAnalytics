@@ -1,0 +1,201 @@
+---
+# This is a sample homework ii file. You need to do more than this for full credit.
+# At least you should fill in all the places with parentheses for a B and use your imagination to add more for an A.
+# render this file by saying
+#   library(rmarkdown)
+#   render("ii.Rmd",pdf_document(latex_engine="xelatex"))
+# at the R console
+title: 'homework ii'
+author: 'Vivek Panchal, Rohit Kunjilikattil'
+date: '2019-09-12'
+output: pdf_document
+header-includes:
+  \usepackage{booktabs}
+---
+
+```{r echo=FALSE}
+# This chunk is just to make it possible to shrink the typeface in succeeding chunks. Mainly this will be used for the crosstabs.
+def.chunk.hook  <- knitr::knit_hooks$get("chunk")
+knitr::knit_hooks$set(chunk = function(x, options) {
+  x <- def.chunk.hook(x, options)
+  ifelse(options$size != "normalsize", paste0("\\", options$size,"\n\n", x, "\n\n \\normalsize"), x)
+})
+```
+# Introduction
+NYC311 is an open data initiative.The main purpose of this non emergency line being generated is to filtrate calls from the emergency phone line 911.This dataset talks about all the complaints that are received in the five Boroughs of NYC i.e Bronx, Queens, Staten Island, Brooklyn and Manhattan.There are several complaints registered with each passing day.Few complaints from the many complaints that are reported are Illegal parked cars, noise complaints, taxi complaints, vending , plumbing and many more. This is a huge dataset.NYC311 receives these complaints and forward them to agencies operating in that area. Agencies are namely NYPD, HPD,TLC,DOT,DPR. The requests are addressed by the agencies and once the request is sorted they then close it. 
+
+# Initialization
+Here we load the tidyverse packages and the `data.table` package and load the nyc311 data set. Then we fix the column names of the nyc311 data so that they have no spaces.
+
+```{r initialize}
+library(tidyverse)
+install.packages('tidyverse', repos = "http://cran.us.r-project.org")
+library(data.table)
+nyc311<-fread("311_Service_Requests_from_2010_to_Present.csv")
+names(nyc311)<-names(nyc311) %>%
+  stringr::str_replace_all("\\s", ".")
+all_complaints <-  nyc311 %>% select(2, 6, 24)
+```
+## Removing two columns
+```{r REMOVE}
+df2 <- nyc311[,c("Unique.Key","City"):=NULL]
+```
+##DUPLICATES
+```{r DUPLICATES}
+if (!require(dplyr)) {
+install.packages("dplyr",dependencies=TRUE)
+library(dplyr)
+}
+nyc311nodups<-distinct(df2)
+isTRUE(all.equal(nyc311nodups,df2))
+```
+
+# Description
+Here we describe the data, showing both a sample and a data dictionary.
+
+## The head of the table
+Here we produce a table of just some relevant columns of data.
+
+```{r tabulate, results="asis"}
+library(xtable)
+options(xtable.comment=FALSE)
+options(xtable.booktabs=TRUE)
+narrow<-nyc311 %>%
+  select(Agency,
+	 Complaint.Type,
+	 Descriptor,
+	 Incident.Zip,
+	 Status,
+	 Borough)
+xtable(head(narrow))
+```
+
+## Data Dictionary
+For our analysis we are working with following columns from the dataset.There were a total of 52 Columns in our dataset. A detailed description is given below:
+Agency - It has acronym of responding agency in the New York city.
+Agency Name -  It has full agency name.
+Borough - It has the names of five boroughs in NYC i.e Bronx, Manhattan, Brooklyn, Staten Island and       Queens.
+Complaint.Type - It tells us about the complaint that was registered for example Plumbing, Vending, Noise Complaints, Taxi complaint and many more.
+Descriptor - It is dependent on Complaint type and provides more information about the incident/complaint.
+Status - It shows the status of the complaint that was registered. The statuses are as follows assigned,open, and closed.  
+Incident.zip - It gives zip code of the incident location.
+
+Other Columns in the dataset are as follows:
+Latitude- Latitude of the location.
+Longitude - Longitude of the location.
+Location.type - It tells the type of location it was for example Street, Sidewalk or Park.
+
+
+# Exploration
+Here we explore the columns in the data set.
+
+The following cross tabulation is done in order to visulaize the relationship between the agency and the number of complaints. One of the Xtab is a list of different agencies and the other xtab is a count of complaints registered in each agency. Crosstabing these two xtabs will give a chart displaying the number of complaints registered in each agency.
+
+```{r explore}
+bigAgency <- narrow %>%
+  group_by(Agency) %>%
+  summarize(count=n()) %>%
+  filter(count>1000)
+bigAgency$Agency<-factor(bigAgency$Agency,
+  levels=bigAgency$Agency[order(bigAgency$count)])
+p<-ggplot(bigAgency,aes(x=Agency,y=count)) +
+   geom_bar(stat="identity") +
+   coord_flip()
+p
+```
+
+(More plots should follow here.)
+
+#CORRPLOT
+```{r Initialize}
+library(reshape2)
+nyc311_corr <- nyc311 %>% select( 5, 22)
+new_table2 <- table(melt(nyc311_corr, id.var="Complaint.Type"))
+new_table2<- as.data.table(new_table2)
+nyc311_corr2<-new_table2 %>% select( 1, 4)
+wide_table <- spread(new_table2,'Complaint.Type',N)
+wide_table <- wide_table[,3:10]
+resultfinal <- cor(wide_table, use = "complete.obs")
+library(corrplot)
+p <- corrplot(resultfinal, type="upper", order="hclust")
+p
+```
+
+As it is not possible to create a correlation matrix of non-numeric data, we first created a table of the frequency of different complaint types against different boroughs. Then we selected the complaint type and the frequency column from this table and calculated its correlation matrix which was then used to plot the corrplot. This corrplot shows how the different complaint types are related to each other. There are a total of 182 complaint types but we are only displaying the first few for clarity in the corrplot
+
+#BAR PLOT
+```{r barplot}
+all_complaints$Complaint.Type[grepl("^Noise.*", all_complaints$Complaint.Type)] <- "Noise"
+
+all_complaints_temp <- all_complaints %>%
+    group_by(Complaint.Type) %>%
+    summarise(count=n()) %>%
+    arrange(desc(count))
+top10_complaints <- top_n(all_complaints_temp, 10, count)
+ggplot(top10_complaints) + geom_bar(aes(x=top10_complaints$Complaint.Type , y = top10_complaints$count
+                                     ), fill = "Orange",
+             stat = "identity") + theme_minimal() +
+    xlab("") + ylab("Number of Complaints") + coord_flip()
+```
+
+This plot shows that against which complaint type maximum number of complaints were reported.We have made use of ggplot for analysis.It helps in creating graph that can be both univariate or multivariate categorical or numerical data.
+
+#PLOTRIX
+```{r piechart}
+library(plotrix)
+slices <- c(18.8, 21.8, 23.4, 31.2, 4.8)
+lbl <- c("BRONX", "MANHATTAN", "QUEENS", "BROOKLYN", "STATEN ISLAND")
+pct <- round(slices/sum(slices)*100)
+lbl <- paste(lbl, pct)
+lbl <- paste(lbl,"%",sep="")
+pie3D(slices,labels=lbl,explode=0.05,
+   main="Complaints for each Borough ")
+```
+
+This plot shows the % percentage complaints that were reported for each Borough. We made use of the library plotrix in this analysis.We have made use of "pie3D" function which displays pie chart in 3D manner.The maximum number of complaints were registered for Brooklyn Borough. This was calculated by selecting the columns 'Complaint.Type' and Borough.Grouping of this data was done by using Borough and summarization was done by finding the total length of(Complaint.Type) and then arranging them in Descending order.Hence,the following analysis was obtained.
+
+(Next we include a crosstabulation.)
+
+#CROSSTAB-1
+```{r crosstabs, size='footnotesize'}
+xtabA<-dplyr::filter(narrow,
+  Complaint.Type=='HEATING' |
+  Complaint.Type=='GENERAL CONSTRUCTION' |
+  Complaint.Type=='PLUMBING'
+)
+xtabB<-select(xtabA,Borough,"Complaint.Type")
+library(gmodels)
+CrossTable(xtabB$Borough,xtabB$'Complaint.Type')
+```
+
+Cross-tabulations are used to represent the relationship between two or more variables in a dataset analytically. The axes of the crosstable are the variables whose relationship is to be represented. Considering the above cross-tab, we can see that it shows the number of 'PLUMBING' complaints against the different boroughs in New York City. From the crosstab, we can see in detail how many complaints were reported in a particular borough. As we can see, Brookyln has the largest contribution. The crosstab also sheds light on table proportions, showing that Brooklyn contributes to 0.406 % of the total 'Plumbing' complaints, leading to a total of 99 complaints.
+
+#CROSSTAB -2
+```{r crosstabs2, size='footnotesize'}
+xtabA<-dplyr::filter(narrow,
+  Complaint.Type == 'Noise' | Complaint.Type == 'Illegal Parking' | Complaint.Type == 'Blocked Driveway' | Complaint.Type == 'HEAT/HOT WATER' | Complaint.Type == 'Street Condition')
+xtabB<-select(xtabA,Borough,"Borough")
+library(gmodels)
+CrossTable(xtabB$Borough,xtabA$Complaint.Type)
+```
+
+In this crosstab, we look at analysing how the complaints types are spread with repect to the different boroughs. For this we take one of the xtabs to be the differnt types of complaints and list the borough names in a series of OR operations in the other xtab. By cross tabulating, these two tabs we get to see the division of complaint types in each borough. As calculating all types of complaints yielded a large result which was difficult to go through we decided to filter it to show only the top 5 most registered complaints using the information from the top 10 complaints bar chart.
+
+#CROSSTAB- 3
+```{r crosstabs3, size='footnotesize'}
+xtabA<-dplyr::filter(nyc311,
+  Complaint.Type == 'Noise'|Complaint.Type == 'Street Condition'|Complaint.Type == 'HEAT/HOT WATER')
+xtabB<-select(xtabA,Status,"Complaint.Type")
+library(gmodels)
+CrossTable(xtabA$Status,xtabB$Complaint.Type)
+```
+
+Using the information we got from the top 10 complaints graph, we create a cross tabulation of the top 3 complaints with their complaint statuses. This information is useful to understand how responsive the government is about the types of complaints that are registered the most. Here the first xtable is a series of OR conditions in order to select the top 3 noise complaints and then the other xtab is the statuses. The cross tablulation then shows different statuses of each noise complaint along with their proper proportions.
+
+# Installing TinyTex
+```{r Installing TinyTex}
+install.packages('tinytex', repos = "http://cran.us.r-project.org")
+tinytex::install_tinytex()
+```
+# Conclusion
+We undertook following steps for analysis and came up with a conclusion.Firstly, we removed two columns from our dataset i.e 'Unique.Key'(to identify duplicate values) and 'City' because it is always going to be New York.Secondly, we checked for duplicates in our dataset and found out those values. We checked for distinct values and stored them in a variable called as 'nyc311nodups' and later compared it with the duplicate values that we had obtained and the result was False.We made use of several libraries for the purpose of analysis.In corrplots,we represented how each complaint types affect all oter complaint types.A bar plot created showed that the maximum number of complaints were registered against Noise in all the Boroughs.The maximum number of complaints were reported to HPD(Department of Housing Preservation and Development).We made use of Plotrix which showed that Brooklyn was the Borough where maximum number of complaints were made followed by Staten Island where the least % of complaints were made.Then,crosstabulation was performed on dataset which showed that maximum number of complaints for Plumbing was registered in Brooklyn.CrossTabulation 2 showed the number of top five complaints in each borough. CrossTabulation 3 showed the statuses for complaint type Noise in each Borough.The results of these analysis and visualizations revealed about the volume of complaints filed at New York city.This can surely help all the government agencies to take necessary steps in the future to overcome such incidents.It was also help in resolving various issues in a dedicated time.It will also help them in recruiting more people where there is need of an hour in this case for Brooklyn where the maximum number of complaints were lodged. 

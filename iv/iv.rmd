@@ -1,0 +1,100 @@
+---
+title: 'homework iv'
+author: 'Vivek Panchal,Rohit Kunjilikattil'
+date: '2019-10-3'
+output:
+    pdf_document:
+    latex_engine: xelatex
+header-includes:
+  \usepackage{booktabs}
+---
+
+```{r echo=FALSE}
+# This chunk is just to make it possible to shrink the typeface in succeeding chunks. Mainly this will be used for the crosstabs.
+def.chunk.hook  <- knitr::knit_hooks$get("chunk")
+knitr::knit_hooks$set(chunk = function(x, options) {
+  x <- def.chunk.hook(x, options)
+  ifelse(options$size != "normalsize", paste0("\\", options$size,"\n\n", x, "\n\n \\normalsize"), x)
+})
+```
+
+# Introduction
+In this assignment, we clean the NYC311 data to make sure it conforms to the tidy data standards. For this we use various tidyr functions like **spearate** and **filter**. We transform the dataset into tidy data. Further we select another dataset, the nyc_payroll_information dataset, and clean that dataset so that it too follows the standards of tidy data.
+
+Tidyverse is a r package that helps in making data tidy. Tidy data is defined as data which follows three basic rules : each variable must have its own column, each observation must have its own row and finally each value must have its own cell.One of the advantages of tidy data is it's easier to work with data that always has a consistent structure. Further, R's vectorised nature makes it particularly easy to transform tidy data.
+
+```{r Installing packages}
+library(tidyverse)
+install.packages('tidyverse', repos = "http://cran.us.r-project.org")
+library(data.table)
+library(plyr)
+library(dplyr) 
+
+
+```
+
+```{r Reading csv file}
+nyc311_a = fread("311_Service_Requests_from_2010_to_Present.csv")
+```
+
+# Cleaning Data
+Here, we first try to clean data as much as possible so that we do not have to waste our processing power on data that we don't want or on bad data. As the complaint type is one of the most important columns, we try to make it as uniform as possible. We go about doing this by removing any unwanted spaces, replacing hyphens with slashes, etc. We then filter the zipcodes to only have values of length 5. 
+
+```{r Data Cleaning}
+nyc311_a$Complaint.Type = tolower(nyc311_a$Complaint.Type) 
+nyc311_a$Complaint.Type = gsub('s$', '', nyc311_a$Complaint.Type) 
+nyc311_a$Incident.Zip = gsub('-[[:digit:]]{4}$', '',nyc311_a$Incident.Zip)
+nyc311_a$Complaint.Type = gsub('paint - plaster', 'paint/plaster', nyc311_a$Complaint.Type)
+nyc311_a$Complaint.Type = gsub('general construction', 'construction', nyc311_a$Complaint.Type)
+nyc311_a$Complaint.Type = gsub('nonconst', 'construction', nyc311_a$Complaint.Type)
+nyc311_a$Complaint.Type = gsub('street sign - [[:alpha:]]+', 'street sign', nyc311_a$Complaint.Type)
+nyc311_a$Complaint.Type = gsub('fire alarm - .+','fire alarm', nyc311_a$Complaint.Type)
+nyc311_clean2 = nyc311_a
+
+```
+
+# Separating Columns
+Here, we see multiple columns that are of class character that have date and time values together in one column. So we use the **separate** function from tidyr library to separate such columns into separate columns with date and time stored separately.
+
+```{r Creating seperate Columns for better analysis of data}
+nyc311_clean2 <- nyc311_clean2 %>% 
+  separate(`Created Date`, into = c("Created Date", "Created Time"), sep = 10)
+
+nyc311_clean2 <- nyc311_clean2 %>% 
+  separate(`Closed Date`, into = c("Closed Date", "Closed Time"), sep = 10)
+
+nyc311_clean2 <- nyc311_clean2 %>% 
+  separate(`Due Date`, into = c("Due Date", "Due Time"), sep = 10)
+
+nyc311_clean2 <- nyc311_clean2 %>% 
+  separate(`Resolution Action Updated Date`, into = c("Resolution Action Updated Date", "Resolution Action Updated Time"), sep = 10)
+```
+
+# Removing unwanted columns
+Further we remove rows which have 'Unspecified' listed for Boroughs. Finally as all of this data is from New York City, we remove the city column as it is redundant. 
+
+```{r Getting count of Complaints on basis of Incident Zip}
+library(data.table)
+nyc311_clean2 <- data.table(nyc311_clean2) 
+
+nyc311_clean2 <- nyc311_clean2[,c("City"):=NULL]
+nyc311_clean2 <- nyc311_clean2 %>% filter(!str_detect(Borough, "Unspecified"))
+
+```
+
+# Reading a dataset from a url
+Here we use r to read and download the csv file directly from the url. The saves us the trouble of sharing the csv file along with the rmd file. This way is much more efficient. We are using NYC payroll data. This dataset contians the salary, pay rate and total compensation of every New York City employees from year 2014 till 2017.This dataset provides columns for fiscal year, agency they work for, borough they are working in.This will provide us with an insight into who gets paid how much and for what. The source dataset that we are extracting from url already follows the rules of tidydata. Hence, we do not use tidyr functions to further clean the data.
+
+```{r Reading csv from URL}
+nyc_payroll <- fread("https://data.cityofnewyork.us/api/views/k397-673e/rows.csv?accessType=DOWNLOAD")
+```
+
+There are 3 types of pay basis i.e Per hour, Per day and Per annum. We are trying to explore this by finding the total count of such employees working in New York city.
+
+```{r Payment Categories}
+nyc_payroll %>% dplyr::group_by(`Pay Basis`) %>% dplyr::summarise(n = n())
+```
+
+# Conclusion
+In this assignment, we learnt the definition of tidy data and implemented steps to convert normal or 'messy' data to tidy data. Tidy data is data that conforms to the basic rule that each variable, observation and value must have its own column, row and cell respectively.  Further, we introduced a new dataset using R's capability to directly read data from a URL. We choose the Nyc Payroll Dataset. This dataset can shows the disparities in payroll based on Borough, gender and job types. We can use this dataset in conjunction with the NYC311 data to find out which agencies spend what on salaries. Then we can map out whether their is a correlation between high salaries and better performance as in whether departments that have higher salaries are better and faster at resolving complaints.
+
